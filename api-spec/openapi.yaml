@@ -1,0 +1,758 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Dark Fantasy RPG API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: game
+    description: RPG game operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /game/session:
+    post:
+      operationId: createGameSession
+      tags: [game]
+      summary: Create a new game session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGameSessionBody"
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSession"
+    get:
+      operationId: listGameSessions
+      tags: [game]
+      summary: List all game sessions
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GameSession"
+
+  /game/session/{sessionId}:
+    get:
+      operationId: getGameSession
+      tags: [game]
+      summary: Get a game session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Game session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSession"
+        "404":
+          description: Not found
+
+  /game/session/{sessionId}/character:
+    post:
+      operationId: generateCharacter
+      tags: [game]
+      summary: Randomly generate a character (race + class) for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Generated character
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharacterGenResult"
+    patch:
+      operationId: confirmCharacter
+      tags: [game]
+      summary: Confirm character selection and distribute initial stats
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfirmCharacterBody"
+      responses:
+        "200":
+          description: Confirmed character
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSession"
+
+  /game/session/{sessionId}/action:
+    post:
+      operationId: performAction
+      tags: [game]
+      summary: Perform an action in the game (send message, choose option)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PerformActionBody"
+      responses:
+        "200":
+          description: Game engine response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameActionResponse"
+
+  /game/session/{sessionId}/inventory:
+    get:
+      operationId: getInventory
+      tags: [game]
+      summary: Get character inventory
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Inventory items
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inventory"
+
+  /game/session/{sessionId}/stats:
+    get:
+      operationId: getCharacterStats
+      tags: [game]
+      summary: Get full character stats, skills, and status effects
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Character stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharacterStats"
+
+  /game/session/{sessionId}/journal:
+    get:
+      operationId: getJournal
+      tags: [game]
+      summary: Get quest log and story history
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Journal data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Journal"
+
+  /game/session/{sessionId}/achievements:
+    get:
+      operationId: getAchievements
+      tags: [game]
+      summary: Get unlocked achievements for a session
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of unlocked achievements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AchievementItem"
+
+  /game/session/{sessionId}/allocate-stats:
+    post:
+      operationId: allocateStats
+      tags: [game]
+      summary: Allocate stat points after leveling up
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AllocateStatsBody"
+      responses:
+        "200":
+          description: Updated stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CharacterStats"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    CreateGameSessionBody:
+      type: object
+      properties:
+        playerName:
+          type: string
+      required:
+        - playerName
+
+    GameSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        playerName:
+          type: string
+        phase:
+          type: string
+          description: "current: menu | character_gen | stats_distribution | playing | combat | dead"
+        characterName:
+          type: ["string", "null"]
+        race:
+          type: ["string", "null"]
+        raceRarity:
+          type: ["string", "null"]
+        class:
+          type: ["string", "null"]
+        classRarity:
+          type: ["string", "null"]
+        level:
+          type: integer
+        experience:
+          type: integer
+        currentHp:
+          type: integer
+        maxHp:
+          type: integer
+        gold:
+          type: integer
+        moralAlignment:
+          type: string
+        factionName:
+          type: ["string", "null"]
+        age:
+          type: integer
+        statPoints:
+          type: integer
+        storyContext:
+          type: string
+          description: Serialized game state for the AI engine
+        lastNarrative:
+          type: ["string", "null"]
+        choices:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - playerName
+        - phase
+        - characterName
+        - race
+        - raceRarity
+        - class
+        - classRarity
+        - level
+        - experience
+        - currentHp
+        - maxHp
+        - gold
+        - moralAlignment
+        - factionName
+        - age
+        - statPoints
+        - storyContext
+        - lastNarrative
+        - choices
+        - createdAt
+        - updatedAt
+
+    CharacterGenResult:
+      type: object
+      properties:
+        race:
+          type: string
+        raceRarity:
+          type: string
+        raceDropChance:
+          type: string
+        raceDescription:
+          type: string
+        raceAbilities:
+          type: array
+          items:
+            type: string
+        class:
+          type: string
+        classRarity:
+          type: string
+        classDropChance:
+          type: string
+        classDescription:
+          type: string
+        classAbilities:
+          type: array
+          items:
+            type: string
+        hasSynergy:
+          type: boolean
+        synergyBonus:
+          type: ["string", "null"]
+        suggestedStats:
+          $ref: "#/components/schemas/StatBlock"
+      required:
+        - race
+        - raceRarity
+        - raceDropChance
+        - raceDescription
+        - raceAbilities
+        - class
+        - classRarity
+        - classDropChance
+        - classDescription
+        - classAbilities
+        - hasSynergy
+        - synergyBonus
+        - suggestedStats
+
+    StatBlock:
+      type: object
+      properties:
+        strength:
+          type: integer
+        agility:
+          type: integer
+        intelligence:
+          type: integer
+        endurance:
+          type: integer
+        luck:
+          type: integer
+        charisma:
+          type: integer
+        will:
+          type: integer
+      required:
+        - strength
+        - agility
+        - intelligence
+        - endurance
+        - luck
+        - charisma
+        - will
+
+    ConfirmCharacterBody:
+      type: object
+      properties:
+        race:
+          type: string
+        raceRarity:
+          type: string
+        class:
+          type: string
+        classRarity:
+          type: string
+        stats:
+          $ref: "#/components/schemas/StatBlock"
+        hasSynergy:
+          type: boolean
+        synergyBonus:
+          type: ["string", "null"]
+      required:
+        - race
+        - raceRarity
+        - class
+        - classRarity
+        - stats
+        - hasSynergy
+
+    PerformActionBody:
+      type: object
+      properties:
+        action:
+          type: string
+          description: The player's chosen action or text input
+        actionType:
+          type: string
+          description: "choice | command | text"
+      required:
+        - action
+        - actionType
+
+    GameActionResponse:
+      type: object
+      properties:
+        narrative:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        phase:
+          type: string
+        combatState:
+          type: ["object", "null"]
+          description: Combat state if in combat
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/GameEvent"
+        session:
+          $ref: "#/components/schemas/GameSession"
+      required:
+        - narrative
+        - choices
+        - phase
+        - combatState
+        - events
+        - session
+
+    GameEvent:
+      type: object
+      properties:
+        type:
+          type: string
+          description: "levelup | item_gained | item_lost | quest_started | quest_completed | faction_change | stat_change | death | effect_applied"
+        data:
+          type: object
+      required:
+        - type
+        - data
+
+    Inventory:
+      type: object
+      properties:
+        weapons:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        armor:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        accessories:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        consumables:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+        questItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/Item"
+      required:
+        - weapons
+        - armor
+        - accessories
+        - consumables
+        - questItems
+
+    Item:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+        rarity:
+          type: string
+        description:
+          type: string
+        stats:
+          type: object
+        quantity:
+          type: integer
+      required:
+        - id
+        - name
+        - category
+        - rarity
+        - description
+        - stats
+        - quantity
+
+    CharacterStats:
+      type: object
+      properties:
+        strength:
+          type: integer
+        agility:
+          type: integer
+        intelligence:
+          type: integer
+        endurance:
+          type: integer
+        luck:
+          type: integer
+        charisma:
+          type: integer
+        will:
+          type: integer
+        statPoints:
+          type: integer
+        activeSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/Skill"
+        passiveSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/Skill"
+        uniqueSkills:
+          type: array
+          items:
+            $ref: "#/components/schemas/Skill"
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/StatusEffect"
+        magicSchools:
+          type: array
+          items:
+            type: string
+      required:
+        - strength
+        - agility
+        - intelligence
+        - endurance
+        - luck
+        - charisma
+        - will
+        - statPoints
+        - activeSkills
+        - passiveSkills
+        - uniqueSkills
+        - effects
+        - magicSchools
+
+    Skill:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        level:
+          type: integer
+      required:
+        - name
+        - description
+        - level
+
+    StatusEffect:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          description: "curse | disease | blessing | madness"
+        description:
+          type: string
+        duration:
+          type: ["integer", "null"]
+      required:
+        - name
+        - type
+        - description
+        - duration
+
+    Journal:
+      type: object
+      properties:
+        activeQuests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quest"
+        completedQuests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quest"
+        failedQuests:
+          type: array
+          items:
+            $ref: "#/components/schemas/Quest"
+        storyHistory:
+          type: array
+          items:
+            $ref: "#/components/schemas/HistoryEntry"
+        npcRelationships:
+          type: array
+          items:
+            $ref: "#/components/schemas/NpcRelationship"
+      required:
+        - activeQuests
+        - completedQuests
+        - failedQuests
+        - storyHistory
+        - npcRelationships
+
+    Quest:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+        objectives:
+          type: array
+          items:
+            type: string
+        reward:
+          type: string
+      required:
+        - id
+        - name
+        - description
+        - status
+        - objectives
+        - reward
+
+    HistoryEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        narrative:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        chosenAction:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+      required:
+        - id
+        - narrative
+        - choices
+        - chosenAction
+        - createdAt
+
+    NpcRelationship:
+      type: object
+      properties:
+        name:
+          type: string
+        relationship:
+          type: integer
+          description: "-100 to 100"
+        status:
+          type: string
+      required:
+        - name
+        - relationship
+        - status
+
+    AchievementItem:
+      type: object
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        icon:
+          type: string
+        unlockedAt:
+          type: string
+      required:
+        - key
+        - name
+        - description
+        - icon
+        - unlockedAt
+
+    AllocateStatsBody:
+      type: object
+      properties:
+        allocations:
+          $ref: "#/components/schemas/StatBlock"
+      required:
+        - allocations
